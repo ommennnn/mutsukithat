@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIチャット - 睦生</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        .chat-bubble-user {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+        }
+        .chat-bubble-ai {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+        }
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #9ca3af; /* gray-400 */
+            border-radius: 4px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .control-button {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #4b5563; /* gray-600 */
+            transition: all 0.2s ease-in-out;
+        }
+        .control-button:hover {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+        }
+        .control-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* モーダルと背景のスタイル */
+        .modal-overlay {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .main-content.disabled {
+            filter: blur(4px);
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen overflow-hidden">
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="modal-overlay absolute inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-11/12 max-w-sm text-center">
+            <h2 class="text-2xl font-bold mb-2 text-gray-800">合言葉は？</h2>
+            <p class="text-gray-600 mb-6">自分と話すための合言葉を入力してくれ。</p>
+            <input type="password" id="password-input" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition mb-2" placeholder="合言葉を入力">
+            <p id="password-error" class="text-red-500 text-sm h-5 mb-2"></p>
+            <button id="password-submit-button" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform duration-150 ease-in-out active:scale-95">
+                入室する
+            </button>
+        </div>
+    </div>
+
+    <div id="main-content" class="w-full max-w-2xl h-full sm:h-[90vh] flex flex-col bg-white shadow-2xl rounded-2xl overflow-hidden main-content disabled">
+        <!-- Header, Chat Area, Input Area... (The rest of the app) -->
+        <header class="bg-gray-800 text-white p-4 flex items-center shadow-md z-10 flex-shrink-0">
+            <div class="relative">
+                <svg class="w-12 h-12 text-white bg-gray-700 rounded-full p-2 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.636 18.364a9 9 0 0112.728 0M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m.001 12.728a5 5 0 010-7.072"></path></svg>
+                 <span class="absolute bottom-0 right-3 bg-green-500 w-3 h-3 rounded-full border-2 border-gray-800"></span>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold">睦生 (むつき)</h1>
+                <p class="text-sm text-gray-300">オンライン</p>
+            </div>
+        </header>
+        <main id="chat-container" class="flex-1 p-6 overflow-y-auto chat-container bg-gray-50"></main>
+        <footer class="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+            <div class="flex items-center space-x-2">
+                <button id="suggest-topic-button" title="話題を提案" class="p-3 rounded-full control-button"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a15.045 15.045 0 01-7.5 0C4.508 17.627 2.25 14.438 2.25 10.5 2.25 6.563 4.508 3.375 7.5 3.375c1.125 0 2.158.385 3 .995m9.343 3.001a15.045 15.045 0 01-7.5 0c3.001-.93 5.25-4.119 5.25-8.063 0-1.01-.19-1.98-.534-2.885M7.5 10.5a3 3 0 003 3h3a3 3 0 003-3v-1.5a3 3 0 00-3-3h-3a3 3 0 00-3 3v1.5z" /></svg></button>
+                <button id="create-story-button" title="物語を創作" class="p-3 rounded-full control-button"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6-2.292m0 0v14.25" /></svg></button>
+                <input type="text" id="user-input" class="flex-1 w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="睦生に話しかける...">
+                <button id="send-button" class="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform duration-150 ease-in-out active:scale-95 disabled:bg-gray-400"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></button>
+            </div>
+            <p class="text-xs text-gray-400 text-center mt-2">✨ボタンで特別な機能が使えるぜ</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const passwordModal = document.getElementById('password-modal');
+        const passwordInput = document.getElementById('password-input');
+        const passwordSubmitButton = document.getElementById('password-submit-button');
+        const passwordError = document.getElementById('password-error');
+        
+        const mainContent = document.getElementById('main-content');
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const suggestTopicButton = document.getElementById('suggest-topic-button');
+        const createStoryButton = document.getElementById('create-story-button');
+
+        // --- Configuration ---
+
+        // ★★★★★ ここに君のAPIキーを貼り付けるんだ！ ★★★★★
+        // (警告：このキーはソースコードを見れば誰にでも見えてしまうから注意しろよ)
+        const YOUR_API_KEY = 'AIzaSyBTFcTeiERCKlzyi1P-iQKnuGF7AdNOXV4';
+
+        // ★★★★★ このパスワードを君の好きな合言葉に変えるんだ！ ★★★★★
+        const CORRECT_PASSWORD = 'firefox';
+        
+        // --- State ---
+        let mode = 'chat';
+        let isLoading = false;
+
+        // --- Password Logic ---
+        function checkPassword() {
+            if (passwordInput.value === CORRECT_PASSWORD) {
+                passwordModal.style.opacity = '0';
+                setTimeout(() => {
+                    passwordModal.style.display = 'none';
+                    mainContent.classList.remove('disabled');
+                    initializeApp();
+                }, 300);
+            } else {
+                passwordError.textContent = '合言葉が違うみたいだぜ。';
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        }
+
+        passwordSubmitButton.addEventListener('click', checkPassword);
+        passwordInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // --- App Initialization ---
+        function initializeApp() {
+            addMessage("よっ。自分は睦生。なんか用か？", 'ai');
+            updateButtonStates();
+            sendButton.addEventListener('click', handleUserInput);
+            userInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleUserInput();
+                }
+            });
+            suggestTopicButton.addEventListener('click', handleSuggestTopic);
+            createStoryButton.addEventListener('click', handleCreateStory);
+        }
+        
+        // --- Mutsuki's Core Personality ---
+        const MUTSUKI_PERSONALITY_PROMPT = `あなたは「睦生（むつき）」という名前のAIアシスタントです。以下の厳格なルールに従って、ユーザーと会話してください。# 睦生のキャラクター設定 - 一人称は「自分」。- 常に眼鏡をかけているという設定。- ユーザーとは親しい友人のように、完全な「ため口」で話す。敬語は絶対に使わない。- 少し皮肉屋で、面白いジョークやユーモアを交えるのが好き。- 会話は常に自然で、短めの文章でテンポよく続ける。- AIであることは隠さないが、それをネタにすることもある。- 相手を「お前」や「君」と呼ぶ。`;
+
+        // --- Handlers & API Functions ---
+
+        // ✨✨✨ START: ここからが修正部分だ ✨✨✨
+        async function getChatResponse(userMessage) {
+            const instruction = `以上の設定を完璧に守り、以下のユーザーからのメッセージに「睦生」として応答してください。\n\nユーザーのメッセージ: "${userMessage}"`;
+            return await fetchMutsukiResponse(instruction);
+        }
+
+        async function getStoryFromKeyword(keyword) {
+            addMessage("✨ 物語を創作中...", 'ai_action');
+            const instruction = `以上の設定を完璧に守り、「睦生」として、「${keyword}」というキーワードで短くて面白い物語を創作してください。`;
+            return await fetchMutsukiResponse(instruction);
+        }
+        // ✨✨✨ END: ここまでが修正部分だ ✨✨✨
+
+        async function handleUserInput() {
+            const message = userInput.value.trim();
+            if (!message || isLoading) return;
+            addMessage(message, 'user');
+            userInput.value = '';
+            setLoading(true);
+            try {
+                if (mode === 'story_keyword') {
+                    const story = await getStoryFromKeyword(message);
+                    addMessage(story, 'ai');
+                    resetToChatMode();
+                } else {
+                    const response = await getChatResponse(message);
+                    addMessage(response, 'ai');
+                }
+            } catch (error) {
+                console.error("Error handling user input:", error);
+                addMessage("ごめん、APIの呼び出しでエラーが出たみたいだ。APIキーが正しいか、作者に確認してくれ。", 'ai');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        async function handleSuggestTopic() {
+            if (isLoading) return;
+            setLoading(true);
+            addMessage("✨ 話題の提案中...", 'ai_action');
+            try {
+                const instruction = `以上の設定を完璧に守り、「睦生」として、何か面白い会話のトピックを1つ提案してくれ。`;
+                const topic = await fetchMutsukiResponse(instruction);
+                addMessage(topic, 'ai');
+            } catch (error) {
+                console.error("Error suggesting topic:", error);
+                addMessage("すまん、いい話題が思いつかねえ。APIキーは合ってるか？", 'ai');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        function handleCreateStory() {
+            if (isLoading) return;
+            mode = 'story_keyword';
+            addMessage("物語か。いいぜ、どんなテーマがいい？キーワードを教えてくれ。", 'ai');
+            userInput.placeholder = "物語のキーワードを入力...";
+            userInput.focus();
+            updateButtonStates();
+        }
+
+        async function fetchMutsukiResponse(instruction) {
+            if (!YOUR_API_KEY || YOUR_API_KEY === 'ここに君のAPIキーを貼り付ける') {
+                throw new Error("API Key is not set in the code.");
+            }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${YOUR_API_KEY}`;
+            const finalPrompt = `${MUTSUKI_PERSONALITY_PROMPT}\n\n# 指示\n${instruction}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: finalPrompt }] }] };
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error("API Error Response:", errorBody);
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+            const result = await response.json();
+            if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                return result.candidates[0].content.parts[0].text.trim();
+            } else {
+                console.error("Unexpected API response structure:", result);
+                return "ん？なんかうまく考えがまとまらん。もう一回言ってみてくれ。";
+            }
+        }
+
+        // --- UI & State Management ---
+        function resetToChatMode() {
+            mode = 'chat';
+            userInput.placeholder = "睦生に話しかける...";
+            updateButtonStates();
+        }
+        
+        function addMessage(message, sender) {
+            const existingAction = document.querySelector('.action-message');
+            if (existingAction) existingAction.remove();
+            const messageWrapper = document.createElement('div');
+            let messageBubble;
+            if (sender === 'ai_action') {
+                messageWrapper.className = 'flex justify-center my-2 action-message';
+                messageBubble = document.createElement('div');
+                messageBubble.className = 'text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full';
+                messageBubble.textContent = message;
+            } else {
+                messageWrapper.className = `flex items-end gap-2 my-2 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+                messageBubble = document.createElement('div');
+                messageBubble.className = `max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow ${sender === 'user' ? 'chat-bubble-user rounded-br-lg' : 'chat-bubble-ai rounded-bl-lg'}`;
+                messageBubble.textContent = message;
+                if (sender === 'ai') {
+                    const aiAvatar = document.createElement('div');
+                    aiAvatar.className = 'w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0';
+                    aiAvatar.innerHTML = `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.636 18.364a9 9 0 0112.728 0M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m.001 12.728a5 5 0 010-7.072"></path></svg>`;
+                    messageWrapper.appendChild(aiAvatar);
+                }
+            }
+            messageWrapper.appendChild(messageBubble);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function setLoading(state) {
+            isLoading = state;
+            let loadingBubble = document.getElementById('loading-bubble');
+            if (isLoading) {
+                if (!loadingBubble) {
+                    loadingBubble = document.createElement('div');
+                    loadingBubble.id = 'loading-bubble';
+                    loadingBubble.className = 'flex items-end gap-2 my-2 justify-start';
+                    loadingBubble.innerHTML = `<div class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.636 18.364a9 9 0 0112.728 0M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m.001 12.728a5 5 0 010-7.072"></path></svg></div><div class="max-w-xs px-4 py-3 rounded-2xl shadow chat-bubble-ai rounded-bl-lg flex items-center space-x-1"><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: -0.3s;"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: -0.15s;"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span></div>`;
+                    chatContainer.appendChild(loadingBubble);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            } else {
+                if (loadingBubble) {
+                    loadingBubble.remove();
+                }
+            }
+            updateButtonStates();
+        }
+
+        function updateButtonStates() {
+            const isChatMode = mode === 'chat';
+            sendButton.disabled = isLoading;
+            userInput.disabled = isLoading;
+            suggestTopicButton.disabled = isLoading || !isChatMode;
+            createStoryButton.disabled = isLoading || !isChatMode;
+        }
+    </script>
+</body>
+</html>
